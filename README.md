@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Momo — webhook WhatsApp
 
-## Getting Started
+Penerima webhook KirimDev menggunakan Next.js App Router, dengan referensi
+[ElvizAl/kempong](https://github.com/ElvizAl/kempong).
 
-First, run the development server:
+## Menjalankan lokal
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+1. Jalankan `bun install`.
+2. Isi `KIRIM_WEBHOOK_SECRET` di `.env.local` sesuai contoh `.env.example`.
+   Jika sudah ada secret di `.env`, hindari konfigurasi ganda. Jangan commit secret.
+3. Jalankan `bun dev`.
+
+Endpoint: `POST /api/webhooks/kirimdev`. Membukanya melalui browser (GET)
+menghasilkan HTTP 405. Untuk menerima webhook saat pengembangan lokal,
+gunakan URL HTTPS publik dari tunnel yang mengarah ke server lokal.
+
+## KirimDev dan Vercel
+
+1. Deploy repo Momo ini ke proyek Vercel penerima webhook. Domain Frozenbot
+   hanya bisa digunakan jika deployment di domain itu memuat endpoint ini.
+2. Di KirimDev, buka **Settings → Webhooks → Tambah webhook**.
+3. Jika menggunakan domain Frozenbot, isi URL:
+   `https://frozenbot-iota.vercel.app/api/webhooks/kirimdev`.
+   Untuk domain lain, ganti domain dan pertahankan path endpoint.
+4. Centang **message.received**, **message.status**, **message.sent**, dan akun
+   WhatsApp untuk bot.
+5. Simpan subscription dan salin signing secret yang ditampilkan.
+6. Di Vercel, buka **Settings → Environment Variables**, tambahkan
+   `KIRIM_WEBHOOK_SECRET` dengan signing secret tersebut untuk **Production**.
+7. Redeploy agar environment variable diterapkan.
+8. Kirim pesan dari nomor lain ke nomor bot. Periksa delivery di KirimDev
+   dan log `Pesan WhatsApp masuk:` di Vercel.
+
+API key KirimDev tidak dibutuhkan untuk penerimaan webhook ini.
+
+## Perilaku endpoint
+
+- Verifikasi signature menggunakan SDK resmi dan raw body, toleransi 300 detik.
+- Sama dengan referensi kempong, hanya membaca pesan pertama pada entry dan
+  change pertama. Respons sukses menyertakan pesan tersebut di field `message`.
+- Mencatat ID pesan, nomor akun, nomor pengirim, jenis pesan, dan teks ke log
+  server. Pesan media dicatat dengan teks `null`; media belum diunduh.
+- `message.status` membaca seluruh `statuses` dari payload Meta, mencatat
+  status pengiriman/pembacaan dan detail kegagalan, lalu mengembalikan `statuses`.
+- `message.sent` membaca envelope KirimDev `data.message`, mencatat pesan
+  keluar beserta ID KirimDev dan ID provider, lalu mengembalikan `message`.
+- Event di luar tiga event tersebut diabaikan setelah signature diverifikasi.
+- HTTP 200 berarti diterima; respons ini bukan balasan chat WhatsApp.
+- HTTP 401: signature hilang/tidak valid; 400: signature kedaluwarsa/JSON
+  tidak valid; 500: kegagalan server lainnya. Secret wajib diisi sebelum pengujian.
+
+Route mengacu pada repo kempong, dengan tambahan handler status dan pesan keluar
+sesuai [format event KirimDev](https://docs.kirimdev.com/webhooks/events/).
+Cache Components dan Partial Prefetching lokal
+dinonaktifkan agar ekspor `runtime = "nodejs"` pada route kompatibel dengan
+Next.js versi proyek ini.
+
+Tahap ini menerima dan mencatat pesan. Agent AI, pengiriman balasan, database,
+dan deduplikasi persisten belum ditambahkan. KirimDev dapat mengirim ulang
+sehingga log bisa muncul lebih dari sekali. Tambahkan deduplikasi ID pesan/event
+sebelum menghubungkan tindakan AI atau pengiriman balasan.
+
+## Pemeriksaan
+
+```sh
+bun test
+bun run lint
+bunx tsc --noEmit
+bun run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Test menggunakan pesan dan secret sintetis tanpa mengirim ke KirimDev/WhatsApp.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Referensi: [KirimDev SDK webhooks](https://docs.kirimdev.com/sdks/typescript/webhooks/).
