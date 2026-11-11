@@ -83,55 +83,14 @@ test("rejects signed malformed JSON", async () => {
   assert.equal((await POST(request("{"))).status, 400);
 });
 
-test("reads status batches across entries and changes with failure details", async () => {
-  const error = { code: 131026, title: "Message undeliverable" };
-  const value = {
-    metadata: { phone_number_id: "test-account" },
-    statuses: [
-      { id: "wamid-test", recipient_id: "test-recipient", status: "read", timestamp: "123" },
-      { id: "wamid-failed", recipient_id: "test-recipient", status: "failed", errors: [error] },
-    ],
-  };
-  const response = await POST(request(JSON.stringify({
-    entry: [{ changes: [{ value }, { value }] }, { changes: [{ value }] }],
-  }), "message.status"));
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  assert.equal(body.ignored, false);
-  assert.equal(body.statuses.length, 6);
-  assert.deepEqual(body.statuses[0], {
-    messageId: "wamid-test", phoneNumberId: "test-account",
-    customerNumber: "test-recipient", status: "read", timestamp: "123", errors: [],
-  });
-  assert.deepEqual(body.statuses[1].errors, [error]);
+test("ignores status and sent events like the reference", async () => {
+  for (const event of ["message.status", "message.sent"]) {
+    const response = await POST(request('{"data":{},"entry":[]}', event));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, ignored: true });
+  }
 });
-
-test("reads the KirimDev outbound envelope rather than Meta entries", async () => {
-  const response = await POST(request(JSON.stringify({
-    id: "event-sent", type: "message.sent",
-    data: {
-      session: "test-account", timestamp: "2026-11-11T00:00:00Z",
-      message: { id: "msg-test", provider_id: "wamid-test", type: "text",
-        body: "Balasan", to: "test-recipient", status: "sent", source: "api" },
-    },
-  }), "message.sent"));
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), {
-    ok: true, message: { eventId: "event-sent", messageId: "msg-test",
-      providerMessageId: "wamid-test", phoneNumberId: "test-account",
-      customerNumber: "test-recipient", type: "text", text: "Balasan",
-      status: "sent", source: "api", timestamp: "2026-11-11T00:00:00Z" },
-  });
-});
-
-test("ignores empty status and outbound payloads", async () => {
-  const status = await POST(request('{"entry":[]}', "message.status"));
-  assert.deepEqual(await status.json(), { ok: true, statuses: [], ignored: true });
-  const sent = await POST(request('{"data":{}}', "message.sent"));
-  assert.deepEqual(await sent.json(), { ok: true, ignored: true });
-});
-
-test("rejects forged signatures on every supported event", async () => {
+test("verifies signatures even for ignored events", async () => {
   for (const event of ["message.received", "message.status", "message.sent"]) {
     const signed = request("{}", event);
     const response = await POST(new Request(signed.url, {
@@ -140,4 +99,3 @@ test("rejects forged signatures on every supported event", async () => {
     assert.equal(response.status, 401);
   }
 });
-

@@ -22,8 +22,7 @@ gunakan URL HTTPS publik dari tunnel yang mengarah ke server lokal.
 3. Jika menggunakan domain Frozenbot, isi URL:
    `https://frozenbot-iota.vercel.app/api/webhooks/kirimdev`.
    Untuk domain lain, ganti domain dan pertahankan path endpoint.
-4. Centang **message.received**, **message.status**, **message.sent**, dan akun
-   WhatsApp untuk bot.
+4. Centang **message.received** dan akun WhatsApp untuk bot.
 5. Simpan subscription dan salin signing secret yang ditampilkan.
 6. Di Vercel, buka **Settings → Environment Variables**, tambahkan
    `KIRIM_WEBHOOK_SECRET` dengan signing secret tersebut untuk **Production**.
@@ -40,17 +39,13 @@ API key KirimDev tidak dibutuhkan untuk penerimaan webhook ini.
   change pertama. Respons sukses menyertakan pesan tersebut di field `message`.
 - Mencatat ID pesan, nomor akun, nomor pengirim, jenis pesan, dan teks ke log
   server. Pesan media dicatat dengan teks `null`; media belum diunduh.
-- `message.status` membaca seluruh `statuses` dari payload Meta, mencatat
-  status pengiriman/pembacaan dan detail kegagalan, lalu mengembalikan `statuses`.
-- `message.sent` membaca envelope KirimDev `data.message`, mencatat pesan
-  keluar beserta ID KirimDev dan ID provider, lalu mengembalikan `message`.
-- Event di luar tiga event tersebut diabaikan setelah signature diverifikasi.
+- Event selain `message.received`, termasuk `message.status` dan `message.sent`,
+  diabaikan setelah signature diverifikasi, sama seperti repo kempong.
 - HTTP 200 berarti diterima; respons ini bukan balasan chat WhatsApp.
 - HTTP 401: signature hilang/tidak valid; 400: signature kedaluwarsa/JSON
   tidak valid; 500: kegagalan server lainnya. Secret wajib diisi sebelum pengujian.
 
-Route mengacu pada repo kempong, dengan tambahan handler status dan pesan keluar
-sesuai [format event KirimDev](https://docs.kirimdev.com/webhooks/events/).
+Route disalin dari repo kempong.
 Cache Components dan Partial Prefetching lokal
 dinonaktifkan agar ekspor `runtime = "nodejs"` pada route kompatibel dengan
 Next.js versi proyek ini.
