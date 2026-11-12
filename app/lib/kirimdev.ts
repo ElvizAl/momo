@@ -1,4 +1,4 @@
-export async function sendWhatsAppText(to: string, text: string) {
+async function postWhatsAppMessage(payload: Record<string, unknown>) {
   const apiKey = process.env.KIRIMDEV_API_KEY;
   const phoneId = process.env.KIRIMDEV_PHONE_NUMBER_ID;
 
@@ -16,9 +16,7 @@ export async function sendWhatsAppText(to: string, text: string) {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: { body: text },
+        ...payload,
       }),
       signal: AbortSignal.timeout(15000),
     },
@@ -27,4 +25,17 @@ export async function sendWhatsAppText(to: string, text: string) {
   if (!response.ok) {
     throw new Error(`KirimDev gagal mengirim: HTTP ${response.status}`);
   }
+}
+
+export async function sendWhatsAppText(to: string, text: string) {
+  await postWhatsAppMessage({ to, type: "text", text: { body: text } });
+}
+
+export async function showWhatsAppTyping(messageId: string) {
+  // Gunakan wamid pesan masuk, bukan ID pesan internal KirimDev.
+  await postWhatsAppMessage({
+    status: "read",
+    message_id: messageId,
+    typing_indicator: { type: "text" },
+  });
 }

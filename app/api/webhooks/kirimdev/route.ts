@@ -1,12 +1,13 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { after } from "next/server";
 import { verifyWebhookSignature } from "@kirimdev/sdk/webhooks";
 import { z } from "zod";
 
 import { generateReply } from "@/app/lib/agent";
-import { sendWhatsAppText } from "@/app/lib/kirimdev";
+import { sendWhatsAppText, showWhatsAppTyping } from "@/app/lib/kirimdev";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const payloadSchema = z.object({
   entry: z.array(
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
 
   const jobs: Array<{
     key: string;
+    messageId: string;
     from: string;
     text: string;
   }> = [];
@@ -120,6 +122,7 @@ export async function POST(request: Request) {
 
         jobs.push({
           key,
+          messageId: message.id,
           from: message.from,
           text: message.text.body,
         });
@@ -132,6 +135,18 @@ export async function POST(request: Request) {
     for (const job of jobs) {
       try {
         const reply = await generateReply(job.text);
+        // Indikator typing kedaluwarsa sekitar 25 detik; tampilkan di akhir jeda.
+        await delay(40_000);
+        try {
+          await showWhatsAppTyping(job.messageId);
+        } catch (error) {
+          // Kegagalan indikator tidak boleh menggagalkan pengiriman balasan.
+          console.warn(
+            "Gagal menampilkan indikator mengetik:",
+            error instanceof Error ? error.message : "Unknown error",
+          );
+        }
+        await delay(20_000);
         await sendWhatsAppText(job.from, reply);
 
         console.info("Pesan berhasil dibalas.");
